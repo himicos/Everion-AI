@@ -18,6 +18,7 @@ import type { TeeLogQuery, TeeLogService } from "@elizaos/plugin-tee-log";
 import { REST, Routes } from "discord.js";
 import type { DirectClient } from ".";
 import { validateUuid } from "@elizaos/core";
+import { SessionManager } from "./sessionManager";
 
 interface UUIDParams {
     agentId: UUID;
@@ -454,5 +455,37 @@ export function createApiRouter(
         }
     });
 
+    const runtime: AgentRuntime = {}; // Initialize your runtime here
+    const sessionManager = new SessionManager(runtime);
+
+    router.post("/api/start-session", async (req, res) => {
+        const { userId, prompt } = req.body;
+        try {
+            const sessionId = await sessionManager.startSession(userId, prompt);
+            res.json({ sessionId });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    });
+
+    router.post("/api/send-message", async (req, res) => {
+        const { userId, message } = req.body;
+        try {
+            await sessionManager.sendMessage(userId, message);
+            const sessionDetails = await sessionManager.getSessionDetails(userId);
+            res.json({ response: sessionDetails.structured_output });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    });
+
     return router;
 }
+
+const app = express();
+app.use(bodyParser.json());
+app.use(cors());
+
+app.listen(3000, () => {
+    console.log("Server is running on port 3000");
+});

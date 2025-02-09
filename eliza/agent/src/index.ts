@@ -133,11 +133,11 @@ import { openaiPlugin } from "@elizaos/plugin-openai";
 import nitroPlugin from "@elizaos/plugin-router-nitro";
 import { devinPlugin } from "@elizaos/plugin-devin";
 import { zksyncEraPlugin } from "@elizaos/plugin-zksync-era";
-import { chainbasePlugin } from "@elizaos/plugin-chainbase";
+//import { chainbasePlugin } from "@elizaos/plugin-chainbase";
 import { holdstationPlugin } from "@elizaos/plugin-holdstation";
-import { nvidiaNimPlugin } from "@elizaos/plugin-nvidia-nim";
+//import { nvidiaNimPlugin } from "@elizaos/plugin-nvidia-nim";
 import { zxPlugin } from "@elizaos/plugin-0x";
-import { hyperbolicPlugin } from "@elizaos/plugin-hyperbolic";
+//import { hyperbolicPlugin } from "@elizaos/plugin-hyperbolic";
 import Database from "better-sqlite3";
 import fs from "fs";
 import net from "net";
@@ -145,21 +145,23 @@ import path from "path";
 import { fileURLToPath } from "url";
 import yargs from "yargs";
 import { emailPlugin } from "@elizaos/plugin-email";
-import { emailAutomationPlugin } from "@elizaos/plugin-email-automation";
+//import { emailAutomationPlugin } from "@elizaos/plugin-email-automation";
 import { seiPlugin } from "@elizaos/plugin-sei";
-import { sunoPlugin } from "@elizaos/plugin-suno";
-import { udioPlugin } from "@elizaos/plugin-udio";
-import { imgflipPlugin } from "@elizaos/plugin-imgflip";
-import { ethstoragePlugin } from "@elizaos/plugin-ethstorage";
-import { zerionPlugin } from "@elizaos/plugin-zerion";
+//import { sunoPlugin } from "@elizaos/plugin-suno";
+//import { udioPlugin } from "@elizaos/plugin-udio";
+//import { imgflipPlugin } from "@elizaos/plugin-imgflip";
+//import { ethstoragePlugin } from "@elizaos/plugin-ethstorage";
+//import { zerionPlugin } from "@elizaos/plugin-zerion";
 import { minaPlugin } from "@elizaos/plugin-mina";
 import { ankrPlugin } from "@elizaos/plugin-ankr";
 import { formPlugin } from "@elizaos/plugin-form";
 import { MongoClient } from "mongodb";
-import { quickIntelPlugin } from "@elizaos/plugin-quick-intel";
+//import { quickIntelPlugin } from "@elizaos/plugin-quick-intel";
+
+import { mainCharacter } from "../mainCharacter.ts"
 
 import { trikonPlugin } from "@elizaos/plugin-trikon";
-import arbitragePlugin from "@elizaos/plugin-arbitrage";
+//import arbitragePlugin from "@elizaos/plugin-arbitrage";
 const __filename = fileURLToPath(import.meta.url); // get the resolved path to the file
 const __dirname = path.dirname(__filename); // get the name of the directory
 
@@ -483,7 +485,7 @@ export async function loadCharacters(
 
     if (loadedCharacters.length === 0) {
         elizaLogger.info("No characters found, using default character");
-        loadedCharacters.push(defaultCharacter);
+        loadedCharacters.push(mainCharacter);
     }
 
     return loadedCharacters;
@@ -1476,7 +1478,7 @@ const startAgents = async () => {
     let serverPort = Number.parseInt(settings.SERVER_PORT || "3000");
     const args = parseArguments();
     const charactersArg = args.characters || args.character;
-    let characters = [defaultCharacter];
+    let characters = [mainCharacter];
 
     if (process.env.IQ_WALLET_ADDRESS && process.env.IQSOlRPC) {
         characters = await loadCharacterFromOnchain();
