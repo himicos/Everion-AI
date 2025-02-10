@@ -69,7 +69,7 @@ const API_CONFIG = {
   BASE_URL: "https://everion-fastapi.fly.dev",
   ENDPOINTS: {
     INSIGHTS: "/insights",
-    MESSAGE: "http://localhost:3000/44be3a29-323b-0289-9bdd-de0b009180b1/message",
+    MESSAGE: "http://localhost:3001/44be3a29-323b-0289-9bdd-de0b009180b1/message",
   },
   REFRESH_INTERVAL: 30000, // Adjust as needed
   HEADERS: {
@@ -96,6 +96,7 @@ class InsightsAPI {
 
       const data = await response.json();
 
+      // We expect either an array of insights or a message indicating no insights.
       if (!Array.isArray(data) && data.message !== "No insights available") {
         throw new Error("Invalid response format");
       }
@@ -130,7 +131,16 @@ class InsightsAPI {
     }
   }
 
-  static async sendMessage(text: string, userName?: string, userId?: string, file?: File) {
+  /**
+   * Send a message to the chat endpoint.
+   * The "file" parameter now contains the full JSON context (as a string) from the insights endpoint.
+   */
+  static async sendMessage(
+    text: string,
+    userName?: string,
+    userId?: string,
+    file?: string
+  ) {
     try {
       const response = await fetch(API_CONFIG.ENDPOINTS.MESSAGE, {
         method: "POST",
@@ -306,8 +316,6 @@ export function InsightsSection() {
           throw new Error("Failed to get quote");
         }
 
-        const expectedOutput = formatTokenAmount(quoteResponse.expectedAmountOut, 9);
-
         addMessage(
           `Found best route!\n\nSwapping: ${formatSwapAmount(swapAmount)} SUI\nPrice Impact: ${(quoteResponse.priceImpact || 0).toFixed(4)}%`,
           "ai"
@@ -351,7 +359,9 @@ export function InsightsSection() {
     }
   };
 
-  // Chat functionality: send message via API endpoint and process response
+  // Chat functionality: send message via API endpoint and process response.
+  // When the selected action is either "analyse" or "discuss", we pass the full JSON
+  // (stringified) from the selected insight as the "file" parameter so that ElizaOS receives full context.
   const handleSendMessage = useCallback(async () => {
     const trimmedInput = inputValue.trim();
     if (!trimmedInput) return;
@@ -360,13 +370,23 @@ export function InsightsSection() {
     addMessage(trimmedInput, "user");
 
     // Display a placeholder message while waiting for the API response.
-    addMessage("analyezing... please wait", "ai");
+    addMessage("Loading response...", "ai");
+
+    let fileContext: string | undefined;
+    if ((selectedAction === "analyse" || selectedAction === "discuss") && selectedInsight) {
+      // Reveal the full JSON from the insights API as context.
+      fileContext = JSON.stringify(selectedInsight, null, 2);
+    }
 
     try {
-      const response = await InsightsAPI.sendMessage(trimmedInput);
+      const response = await InsightsAPI.sendMessage(
+        trimmedInput,
+        undefined,
+        undefined,
+        fileContext
+      );
       // Expecting response to be an array of messages.
       response.forEach((msg: { user: string; text: string; action: string }) => {
-        // Display each message with proper attribution.
         addMessage(msg.text, msg.user === "Everion" ? "ai" : "user");
       });
     } catch (error) {
@@ -375,7 +395,7 @@ export function InsightsSection() {
     }
 
     setInputValue("");
-  }, [inputValue, addMessage]);
+  }, [inputValue, addMessage, selectedAction, selectedInsight]);
 
   const formatTimestamp = useCallback((timestamp: string): string => {
     return new Date(timestamp).toLocaleString();
