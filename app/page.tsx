@@ -1,26 +1,31 @@
-"use client"
+"use client";
 
-import { useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { useWallet, ConnectButton } from "@suiet/wallet-kit"
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useWallet, ConnectButton } from "@suiet/wallet-kit";
 
 export default function HomePage() {
-  const { connected } = useWallet()
-  const router = useRouter()
+  const { connected } = useWallet();
+  const router = useRouter();
 
   useEffect(() => {
     if (connected) {
-      router.push("/dashboard")
+      router.push("/dashboard");
     }
-  }, [connected, router])
+  }, [connected, router]);
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-[#0A0A0F] text-white">
-      <h1 className="mb-8 text-center text-3xl font-bold">Connect your wallet to access the dashboard</h1>
-      <div className="wallet-connect-placeholder">
-        <ConnectButton />
-      </div>
+      {/* Spiral icon placed above the scripture */}
+      <div className="text-6xl mb-4">🌀</div>
+      
+      <h1 className="mb-8 text-center text-3xl font-bold">
+        Connect your wallet to access the dashboard
+      </h1>
+      
+      <ConnectButton>
+        Connect wallet
+      </ConnectButton>
     </div>
-  )
+  );
 }
-

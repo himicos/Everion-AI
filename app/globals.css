@@ -6,16 +6,19 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* Custom utilities */
 @layer utilities {
   .text-balance {
     text-wrap: balance;
   }
 }
 
+/* Base styles with CSS custom properties */
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
+    /* Light Theme (default) */
+    --background: 0 0% 100%;           /* white */
+    --foreground: 0 0% 3.9%;           /* near black */
     --card: 0 0% 100%;
     --card-foreground: 0 0% 3.9%;
     --popover: 0 0% 100%;
@@ -48,9 +51,10 @@ body {
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
+  /* Dark Theme overrides when .dark class is applied to the root element */
   .dark {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
+    --background: 0 0% 3.9%;           /* near black */
+    --foreground: 0 0% 98%;           /* near white */
     --card: 0 0% 3.9%;
     --card-foreground: 0 0% 98%;
     --popover: 0 0% 3.9%;
@@ -82,9 +86,8 @@ body {
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
-}
 
-@layer base {
+  /* Global element styles */
   * {
     @apply border-border;
   }

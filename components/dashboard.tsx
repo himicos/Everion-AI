@@ -1,24 +1,26 @@
-import type React from "react"
-import { useRouter } from "next/navigation"
-import { useWallet } from "@suiet/wallet-kit"
-import { LeftSidebar } from "./left-sidebar"
-import { RightSidebar } from "./right-sidebar"
-import { Button } from "@/components/ui/button"
-import { ChatProvider } from "@/contexts/chat-context"
+"use client"; // FLY Update: Added to enable client-side rendering
+
+import type React from "react";
+import { useRouter } from "next/navigation";
+import { useWallet } from "@suiet/wallet-kit";
+import { LeftSidebar } from "./left-sidebar";
+import { RightSidebar } from "./right-sidebar";
+import { Button } from "@/components/ui/button";
+import { ChatProvider } from "@/contexts/chat-context";
 
 interface DashboardProps {
-  children: React.ReactNode
-  hideChat?: boolean
+  children: React.ReactNode;
+  hideChat?: boolean;
 }
 
-export function Dashboard({ children, hideChat = false }: DashboardProps) {
-  const { disconnect } = useWallet()
-  const router = useRouter()
+export function Dashboard({ children, hideChat = true }: DashboardProps) {
+  const { disconnect } = useWallet();
+  const router = useRouter();
 
   const handleDisconnect = async () => {
-    await disconnect()
-    router.push("/")
-  }
+    await disconnect();
+    router.push("/");
+  };
 
   return (
     <ChatProvider>
@@ -36,8 +38,9 @@ export function Dashboard({ children, hideChat = false }: DashboardProps) {
           </header>
           <main className="flex-1 overflow-y-auto p-6">{children}</main>
         </div>
+        {/* The RightSidebar will render only if hideChat is false */}
         <RightSidebar hideChat={hideChat} />
       </div>
     </ChatProvider>
-  )
+  );
 }

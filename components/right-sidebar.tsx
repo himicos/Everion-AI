@@ -9,9 +9,10 @@ import { useChat } from "@/contexts/chat-context"
 
 interface RightSidebarProps {
   hideChat?: boolean
+  bottomPanel?: boolean
 }
 
-export function RightSidebar({ hideChat = false }: RightSidebarProps) {
+export function RightSidebar({ hideChat = false, bottomPanel = false }: RightSidebarProps) {
   if (hideChat) {
     return null
   }
@@ -31,8 +32,13 @@ export function RightSidebar({ hideChat = false }: RightSidebarProps) {
     }, 1000)
   }
 
+  // Change the container style if we are using it as a bottom panel.
+  const containerClassName = bottomPanel 
+    ? "w-full bg-secondary p-4 flex flex-col" 
+    : "w-80 bg-secondary p-4 flex flex-col h-screen"
+
   return (
-    <aside className="w-80 bg-secondary p-4 flex flex-col h-screen">
+    <aside className={containerClassName}>
       <h2 className="text-xl font-bold mb-4">AI Assistant</h2>
       <ScrollArea className="flex-1 mb-4">
         {messages.map((message) => (

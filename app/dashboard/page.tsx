@@ -22,8 +22,10 @@ export default function DashboardPage() {
 
   return (
     <Dashboard>
+      <div className="flex flex-col items-center mb-6">
+        <h1 className="text-3xl font-bold text-foreground">Everion 🌀</h1>
+      </div>
       <MainContent />
     </Dashboard>
   )
 }
-
