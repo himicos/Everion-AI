@@ -1,0 +1,28 @@
+# flyctl launch added from .gitignore
+# Python-related ignores
+**\__pycache__
+**\*.py[cod]
+**\*.egg-info
+**\dist
+**\build
+**\.env
+**\.venv
+**\env
+**\venv
+
+# Node.js related ignores
+**\node_modules
+**\.next
+**\out
+
+# Log files
+**\*.log
+
+# Editor / IDE directories
+**\.vscode
+**\.idea
+
+# OS generated files
+**\.DS_Store
+**\Thumbs.db
+fly.toml
