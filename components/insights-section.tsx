@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Send, Loader, RefreshCw, Trash2 } from "lucide-react";
@@ -9,7 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import WalletDebug from "@/components/ui/WalletDebug";
-import { useWallet } from "@suiet/wallet-kit"; // Import useWallet
+import { useWallet } from "@suiet/wallet-kit";
 import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
 import { setSuiClient, getQuote, buildTx } from "@7kprotocol/sdk-ts";
 
@@ -17,7 +17,21 @@ import { setSuiClient, getQuote, buildTx } from "@7kprotocol/sdk-ts";
 const suiClient = new SuiClient({ url: getFullnodeUrl("mainnet") });
 setSuiClient(suiClient);
 
-interface Insight {
+// --- Type Definitions ---
+
+interface MarketInsight {
+  type: "market_insight";
+  tweet_id: string;
+  text: string;
+  created_at: string;
+  summary: string;
+  tweet_link: string;
+  source: "twitter";
+  timestamp: string;
+}
+
+interface TokenInsight {
+  type: "token_insight";
   contract: string;
   sender: string;
   name: string;
@@ -31,52 +45,68 @@ interface Insight {
   verified: boolean;
   scam_flag: string;
   timestamp: string;
+  source: "telegram" | "twitter";
 }
 
-const actionButtons = [
+type Insight = MarketInsight | TokenInsight;
+
+type ActionButton = {
+  label: string;
+  action: "discuss" | "ape" | "analyse";
+};
+
+const actionButtons: ActionButton[] = [
   { label: "Discuss 💭", action: "discuss" },
   { label: "Ape 🚀", action: "ape" },
   { label: "Analyse 📊", action: "analyse" },
 ];
 
+// --- Helpers ---
+
+// Type guard for token insights.
+function isTokenInsight(insight: Insight): insight is TokenInsight {
+  return insight.type === "token_insight";
+}
+
+// Returns a unique identifier for an insight.
+// For token insights, return the contract; for market insights, return the tweet_id.
+function getInsightIdentifier(insight: Insight): string {
+  return insight.type === "token_insight" ? insight.contract : insight.tweet_id;
+}
+
+// --- Component Implementation ---
+
 export function InsightsSection() {
-  // Wallet integration
-  const wallet = useWallet(); // Use the wallet object directly
+  const wallet = useWallet();
+  const { messages, addMessage } = useChat();
+
   const [insights, setInsights] = useState<Insight[]>([]);
   const [selectedInsight, setSelectedInsight] = useState<Insight | null>(null);
-  const [selectedAction, setSelectedAction] = useState("");
+  const [selectedAction, setSelectedAction] = useState<ActionButton["action"] | "">("");
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedForDeletion, setSelectedForDeletion] = useState<string[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isSwapping, setIsSwapping] = useState(false); // Swap loading state
+  const [isSwapping, setIsSwapping] = useState(false);
   const [swapAmount, setSwapAmount] = useState("1000000000"); // 1 SUI in minimal units
-  const { messages, addMessage } = useChat();
+  const [sourceFilter, setSourceFilter] = useState<"all" | "telegram" | "twitter">("all");
 
-  // Utility to format swap amount from minimal units to SUI
-  const formatSwapAmount = (amount: string) => {
+  const formatSwapAmount = useCallback((amount: string): string => {
     return (parseInt(amount) / 1000000000).toString();
-  };
+  }, []);
 
-  // Fetch insights from the backend
   const fetchInsights = useCallback(async () => {
     try {
       setIsLoading(true);
       const response = await fetch("http://localhost:8000/insights", {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-        }
+        method: "GET",
+        headers: { Accept: "application/json" },
       });
-
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-
       const data = await response.json();
-      console.log("Received data:", data);
-      
       if (Array.isArray(data)) {
         setInsights(data);
         setError(null);
@@ -94,34 +124,21 @@ export function InsightsSection() {
     }
   }, []);
 
-  // Fetch insights on component mount and set up a refresh interval
   useEffect(() => {
     fetchInsights();
     const intervalId = setInterval(fetchInsights, 30000);
     return () => clearInterval(intervalId);
   }, [fetchInsights]);
 
-  // Handle refresh button click
-  const handleRefresh = async () => {
-    await fetchInsights();
-  };
-
-  // Handle delete button click
   const handleDelete = async () => {
     if (selectedForDeletion.length === 0) return;
-    
     setIsDeleting(true);
     try {
-      // Delete each selected insight
       await Promise.all(
-        selectedForDeletion.map(contract =>
-          fetch(`http://localhost:8000/insights/${contract}`, {
-            method: 'DELETE',
-          })
+        selectedForDeletion.map((id) =>
+          fetch(`http://localhost:8000/insights/${id}`, { method: "DELETE" })
         )
       );
-      
-      // Refresh insights after deletion
       await fetchInsights();
       setSelectedForDeletion([]);
     } catch (error) {
@@ -132,110 +149,102 @@ export function InsightsSection() {
     }
   };
 
-  // Handle insight card click
-  const handleInsightClick = (insight: Insight) => {
-    setSelectedInsight(insight);
-    setInputValue(`Tell me more about ${insight.name} (${insight.symbol})`);
-  };
+  // Only token insights are selectable for chat/swap.
+  const handleInsightClick = useCallback((insight: Insight) => {
+    if (insight.type === "token_insight") {
+      setSelectedInsight(insight);
+      setInputValue(`Tell me more about ${insight.name} (${insight.symbol})`);
+    }
+  }, []);
 
-  // Handle action button click (e.g., "Ape 🚀")
-  const handleActionClick = async (action: string) => {
+  const handleActionClick = async (action: ActionButton["action"]) => {
     setSelectedAction(action);
-  
     if (action === "ape" && selectedInsight) {
+      if (!isTokenInsight(selectedInsight)) {
+        addMessage("Swap is only available for token insights.", "ai");
+        return;
+      }
       if (!wallet.connected || !wallet.account?.address) {
         addMessage("Please connect your wallet to perform a swap.", "ai");
         return;
       }
-  
       setIsSwapping(true);
       addMessage(`Preparing swap for ${selectedInsight.name} (${selectedInsight.symbol})...`, "ai");
-  
       try {
-        // Step 1: Fetch Quote
         const quoteResponse = await getQuote({
-          tokenIn: "0x2::sui::SUI", // Swap from SUI
-          tokenOut: selectedInsight.contract, // Swap to selected token
-          amountIn: swapAmount, // Use the swap amount state
+          tokenIn: "0x2::sui::SUI",
+          tokenOut: selectedInsight.contract,
+          amountIn: swapAmount,
         });
-  
-        // Log quote details
+        if (!quoteResponse) {
+          throw new Error("Failed to get quote");
+        }
         addMessage(
-          `Found best route!\n\n` +
-          `Swapping: ${formatSwapAmount(swapAmount)} SUI\n` +
-          `Expected output: ${quoteResponse.expectedAmountOut || '0'} ${selectedInsight.symbol}\n` +
-          `Price Impact: ${(quoteResponse.priceImpact || 0).toFixed(4)}%`,
+          `Found best route!\n\nSwapping: ${formatSwapAmount(swapAmount)} SUI\nExpected output: ${quoteResponse.expectedAmountOut || "0"} ${selectedInsight.symbol}\nPrice Impact: ${(quoteResponse.priceImpact || 0).toFixed(4)}%`,
           "ai"
         );
-  
-        // Step 2: Build Transaction
         const result = await buildTx({
           quoteResponse,
           accountAddress: wallet.account.address,
-          slippage: 0.01, // 1% slippage
+          slippage: 0.01,
           commission: {
             partner: wallet.account.address,
-            commissionBps: 0, // No commission
+            commissionBps: 0,
           },
         });
-  
-        if (!result || !result.tx) {
-          throw new Error('Failed to build transaction');
+        if (!result?.tx) {
+          throw new Error("Failed to build transaction");
         }
-  
-        // Step 3: Execute Transaction
         const response = await wallet.signAndExecuteTransactionBlock({
           transactionBlock: result.tx,
         });
-  
         addMessage(
-          `✅ Swap successful!\n\n` +
-          `Token: ${selectedInsight.symbol}\n` +
-          `Amount: ${formatSwapAmount(swapAmount)} SUI\n` +
-          `Tx: ${response.digest}`,
+          `✅ Swap successful!\n\nToken: ${selectedInsight.symbol}\nAmount: ${formatSwapAmount(swapAmount)} SUI\nTx: ${response.digest}`,
           "ai"
         );
       } catch (error) {
         console.error("Swap failed:", error);
-        addMessage(
-          `❌ Swap failed: ${error instanceof Error ? error.message : "Unknown error"}`,
-          "ai"
-        );
+        addMessage(`❌ Swap failed: ${error instanceof Error ? error.message : "Unknown error"}`, "ai");
       } finally {
         setIsSwapping(false);
       }
     } else if (selectedInsight) {
-      setInputValue(
-        `${action.charAt(0).toUpperCase() + action.slice(1)} ${selectedInsight.name} (${selectedInsight.contract})`
-      );
+      if (isTokenInsight(selectedInsight)) {
+        setInputValue(
+          `${action.charAt(0).toUpperCase() + action.slice(1)} ${selectedInsight.name} (${selectedInsight.contract})`
+        );
+      }
     }
   };
 
-  // Handle sending a chat message
-  const handleSendMessage = () => {
-    if (!inputValue.trim()) return;
-
-    addMessage(inputValue, "user");
-
+  const handleSendMessage = useCallback(() => {
+    const trimmedInput = inputValue.trim();
+    if (!trimmedInput) return;
+    addMessage(trimmedInput, "user");
     const aiResponse = selectedAction
-      ? `${selectedAction.charAt(0).toUpperCase() + selectedAction.slice(1)}ing ${
-          selectedInsight?.name || ""
-        }...\n\nContract: ${selectedInsight?.contract}\nPrice: ${
-          selectedInsight?.price
-        }\nMarket Cap: ${selectedInsight?.market_cap}`
+      ? `${selectedAction.charAt(0).toUpperCase() + selectedAction.slice(1)}ing ${selectedInsight?.name || ""}...\n\nIdentifier: ${
+          selectedInsight && isTokenInsight(selectedInsight)
+            ? selectedInsight.contract
+            : selectedInsight?.tweet_id || ""
+        }\nPrice: ${selectedInsight?.price || "N/A"}\nMarket Cap: ${selectedInsight?.market_cap || "N/A"}`
       : `Analyzing ${selectedInsight?.name || ""}...`;
-
     setTimeout(() => {
       addMessage(aiResponse, "ai");
     }, 1000);
-
     setInputValue("");
-  };
+  }, [inputValue, selectedAction, selectedInsight, addMessage]);
 
-  // Format timestamp for display
-  const formatTimestamp = (timestamp: string) => {
+  const formatTimestamp = useCallback((timestamp: string): string => {
     return new Date(timestamp).toLocaleString();
-  };
+  }, []);
+
+  const filteredInsights = useMemo(
+    () =>
+      insights.filter((insight) =>
+        sourceFilter === "all" ? true : insight.source === sourceFilter
+      ),
+    [insights, sourceFilter]
+  );
 
   return (
     <div className="flex h-[calc(100vh-12rem)] flex-col">
@@ -247,10 +256,10 @@ export function InsightsSection() {
       {/* Refresh and Delete Buttons */}
       <div className="flex justify-between items-center mb-4">
         <div className="flex gap-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleRefresh}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={fetchInsights}
             disabled={isLoading || isDeleting}
             className="flex items-center gap-2"
           >
@@ -261,11 +270,10 @@ export function InsightsSection() {
             )}
             {isLoading ? "Refreshing..." : "Refresh"}
           </Button>
-
           {selectedForDeletion.length > 0 && (
-            <Button 
-              variant="destructive" 
-              size="sm" 
+            <Button
+              variant="destructive"
+              size="sm"
               onClick={handleDelete}
               disabled={isDeleting}
               className="flex items-center gap-2"
@@ -281,6 +289,28 @@ export function InsightsSection() {
         </div>
       </div>
 
+      {/* Source Filter Buttons */}
+      <div className="flex gap-2 mb-4">
+        <Button
+          variant={sourceFilter === "all" ? "primary" : "outline"}
+          onClick={() => setSourceFilter("all")}
+        >
+          All
+        </Button>
+        <Button
+          variant={sourceFilter === "telegram" ? "primary" : "outline"}
+          onClick={() => setSourceFilter("telegram")}
+        >
+          Telegram
+        </Button>
+        <Button
+          variant={sourceFilter === "twitter" ? "primary" : "outline"}
+          onClick={() => setSourceFilter("twitter")}
+        >
+          Market
+        </Button>
+      </div>
+
       {/* Insights Grid */}
       <div className="flex-1 space-y-6 mb-8">
         {isLoading && insights.length === 0 ? (
@@ -293,80 +323,112 @@ export function InsightsSection() {
           <div className="text-gray-500 p-4 text-center">
             No insights available yet. New insights will appear here automatically.
           </div>
+        ) : filteredInsights.length === 0 ? (
+          <div className="text-gray-500 p-4 text-center">
+            No insights available for the selected source.
+          </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {insights.map((insight) => (
-              <Card
-                key={insight.contract}
-                className={`p-4 cursor-pointer transition-all hover:shadow-lg ${
-                  selectedInsight?.contract === insight.contract
-                    ? "border-primary border-2"
-                    : selectedForDeletion.includes(insight.contract)
-                    ? "border-destructive border-2"
-                    : ""
-                }`}
-                onClick={() => handleInsightClick(insight)}
-              >
-                <div className="flex justify-between items-start mb-2">
-                  <div className="font-bold flex-1">{insight.name}</div>
-                  <div className="flex items-center gap-2">
-                    <div
-                      className={`text-sm px-2 py-1 rounded ${
-                        insight.scam_flag === "None"
-                          ? "bg-green-100 text-green-800"
-                          : "bg-red-100 text-red-800"
-                      }`}
-                    >
-                      {insight.verified ? "✓ Verified" : "Unverified"}
-                    </div>
-                    <Checkbox
-                      checked={selectedForDeletion.includes(insight.contract)}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setSelectedForDeletion(prev => [...prev, insight.contract]);
-                        } else {
-                          setSelectedForDeletion(prev => prev.filter(c => c !== insight.contract));
-                        }
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      className="ml-2"
-                    />
+            {filteredInsights.map((insight) => {
+              const id = getInsightIdentifier(insight);
+              return (
+                <Card
+                  key={id}
+                  className={`p-4 cursor-pointer transition-all hover:shadow-lg ${
+                    selectedInsight && getInsightIdentifier(selectedInsight) === id
+                      ? "border-primary border-2"
+                      : selectedForDeletion.includes(id)
+                      ? "border-destructive border-2"
+                      : ""
+                  }`}
+                  onClick={() => {
+                    if (insight.type === "market_insight") {
+                      // For market insights, open tweet link in a new tab.
+                      window.open(insight.tweet_link, "_blank");
+                    } else {
+                      handleInsightClick(insight);
+                    }
+                  }}
+                >
+                  {insight.type === "market_insight" ? (
+                    <>
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="font-bold flex-1">Market Insight 🔗</div>
+                        <div className="flex items-center gap-2">
+                          <Checkbox
+                            checked={selectedForDeletion.includes(id)}
+                            onCheckedChange={(checked) => {
+                              setSelectedForDeletion((prev) =>
+                                checked ? [...prev, id] : prev.filter((c) => c !== id)
+                              );
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="ml-2"
+                          />
+                        </div>
+                      </div>
+                      <div className="text-sm mb-2">{insight.text}</div>
+                      <div className="text-xs text-gray-500">{insight.summary}</div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="font-bold flex-1">{insight.name}</div>
+                        <div className="flex items-center gap-2">
+                          <div
+                            className={`text-sm px-2 py-1 rounded ${
+                              insight.scam_flag === "None"
+                                ? "bg-green-100 text-green-800"
+                                : "bg-red-100 text-red-800"
+                            }`}
+                          >
+                            {insight.verified ? "✓ Verified" : "Unverified"}
+                          </div>
+                          <Checkbox
+                            checked={selectedForDeletion.includes(id)}
+                            onCheckedChange={(checked) => {
+                              setSelectedForDeletion((prev) =>
+                                checked ? [...prev, id] : prev.filter((c) => c !== id)
+                              );
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="ml-2"
+                          />
+                        </div>
+                      </div>
+                      <div className="text-sm text-gray-500 mb-2">{insight.symbol}</div>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div>
+                          <div className="font-medium">Price</div>
+                          <div>{insight.price}</div>
+                        </div>
+                        <div>
+                          <div className="font-medium">24h Change</div>
+                          <div
+                            className={(insight.price_change_24h || "").startsWith("-")
+                              ? "text-red-500"
+                              : "text-green-500"}
+                          >
+                            {insight.price_change_24h || "N/A"}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="font-medium">Market Cap</div>
+                          <div>{insight.market_cap}</div>
+                        </div>
+                        <div>
+                          <div className="font-medium">Holders</div>
+                          <div>{insight.holders}</div>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                  <div className="text-xs text-gray-400 mt-2">
+                    {formatTimestamp(insight.timestamp)}
                   </div>
-                </div>
-                <div className="text-sm text-gray-500 mb-2">
-                  {insight.symbol}
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div>
-                    <div className="font-medium">Price</div>
-                    <div>{insight.price}</div>
-                  </div>
-                  <div>
-                    <div className="font-medium">24h Change</div>
-                    <div
-                      className={
-                        insight.price_change_24h.startsWith("-")
-                          ? "text-red-500"
-                          : "text-green-500"
-                      }
-                    >
-                      {insight.price_change_24h}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="font-medium">Market Cap</div>
-                    <div>{insight.market_cap}</div>
-                  </div>
-                  <div>
-                    <div className="font-medium">Holders</div>
-                    <div>{insight.holders}</div>
-                  </div>
-                </div>
-                <div className="text-xs text-gray-400 mt-2">
-                  {formatTimestamp(insight.timestamp)}
-                </div>
-              </Card>
-            ))}
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>
@@ -387,7 +449,6 @@ export function InsightsSection() {
             </div>
           ))}
         </ScrollArea>
-
         <div className="space-y-4">
           <div className="flex space-x-2">
             {selectedAction === "ape" && (
@@ -395,7 +456,8 @@ export function InsightsSection() {
                 type="number"
                 value={formatSwapAmount(swapAmount)}
                 onChange={(e) => {
-                  const minimalUnits = (parseFloat(e.target.value) * 1000000000).toString();
+                  const value = e.target.value;
+                  const minimalUnits = Math.max(0, Math.floor(parseFloat(value) * 1000000000)).toString();
                   setSwapAmount(minimalUnits);
                 }}
                 placeholder="Amount in SUI"
@@ -429,11 +491,11 @@ export function InsightsSection() {
             <Input
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
+              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSendMessage()}
               placeholder="Type your message..."
               className="flex-grow"
             />
-            <Button onClick={handleSendMessage}>
+            <Button onClick={handleSendMessage} disabled={!inputValue.trim()} className="flex items-center justify-center">
               <Send className="h-4 w-4" />
             </Button>
           </div>
