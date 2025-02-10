@@ -15,8 +15,8 @@ app = FastAPI(title="Everion Insights API")
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3002"],
-    allow_credentials=True,
+    allow_origins=["*"],          # Allow all origins
+    allow_credentials=False,      # Disable credentials support
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -25,6 +25,7 @@ app.add_middleware(
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TELEGRAM_INSIGHTS_FILE = os.path.join(BASE_DIR, "telegram_insights.json")
 MARKET_INSIGHTS_FILE = os.path.join(BASE_DIR, "market_insights.json")
+SETTINGS_FILE = os.path.join(BASE_DIR, "settings.json")
 
 class InsightFileHandler(FileSystemEventHandler):
     def on_modified(self, event):
@@ -33,25 +34,26 @@ class InsightFileHandler(FileSystemEventHandler):
 
 def ensure_files_exist():
     """Ensure insight files exist and are properly initialized."""
-    for file_path in [TELEGRAM_INSIGHTS_FILE, MARKET_INSIGHTS_FILE]:
+    for file_path in [TELEGRAM_INSIGHTS_FILE, MARKET_INSIGHTS_FILE, SETTINGS_FILE]:
         try:
             if not os.path.exists(file_path):
                 with open(file_path, 'w', encoding='utf-8') as f:
                     json.dump([], f, indent=4)
                 print(f"Created new file: {file_path}")
-            
-            # Verify file is readable and valid JSON
-            with open(file_path, 'r', encoding='utf-8') as f:
-                try:
-                    data = json.load(f)
-                    if not isinstance(data, list):
-                        print(f"Warning: {file_path} contains invalid data, resetting...")
+            else:
+                # Verify file is readable and valid JSON
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    try:
+                        data = json.load(f)
+                        # For settings.json, if not a dict, reset to an empty dict.
+                        if file_path == SETTINGS_FILE and not isinstance(data, dict):
+                            print(f"Warning: {file_path} contains invalid data, resetting...")
+                            with open(file_path, 'w', encoding='utf-8') as f:
+                                json.dump({}, f, indent=4)
+                    except json.JSONDecodeError:
+                        print(f"Warning: {file_path} contains invalid JSON, resetting...")
                         with open(file_path, 'w', encoding='utf-8') as f:
-                            json.dump([], f, indent=4)
-                except json.JSONDecodeError:
-                    print(f"Warning: {file_path} contains invalid JSON, resetting...")
-                    with open(file_path, 'w', encoding='utf-8') as f:
-                        json.dump([], f, indent=4)
+                            json.dump([] if file_path != SETTINGS_FILE else {}, f, indent=4)
         except Exception as e:
             print(f"Error ensuring file {file_path}: {e}")
             traceback.print_exc()
@@ -82,7 +84,7 @@ async def read_root() -> Dict[str, Union[str, List[str]]]:
     """Root endpoint to check if the server is running."""
     return {
         "message": "Everion Insights API is running!",
-        "available_endpoints": ["/insights", "/insights/telegram", "/insights/market", "/insights/{identifier}"],
+        "available_endpoints": ["/insights", "/insights/telegram", "/insights/market", "/insights/{identifier}", "/settings"],
         "status": "active"
     }
 
@@ -189,6 +191,20 @@ async def get_insight_by_identifier(identifier: str):
         status_code=404,
     )
 
+# New endpoint to update settings from the frontend.
+@app.post("/settings")
+async def update_settings(request: Request):
+    try:
+        data = await request.json()
+        # Save the settings data into settings.json
+        with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+        return {"message": "Settings updated successfully."}
+    except Exception as e:
+        print(f"Error updating settings: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
     return JSONResponse(
@@ -203,10 +219,10 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 if __name__ == "__main__":
     import uvicorn
 
-    # Ensure insight files exist and are valid
+    # Ensure insight and settings files exist and are valid
     ensure_files_exist()
 
-    # Set up file watcher
+    # Set up file watcher for insights (optional)
     event_handler = InsightFileHandler()
     observer = Observer()
     observer.schedule(event_handler, path=BASE_DIR, recursive=False)

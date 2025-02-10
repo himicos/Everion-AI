@@ -69,15 +69,16 @@ const API_CONFIG = {
   BASE_URL: "https://everion-fastapi.fly.dev",
   ENDPOINTS: {
     INSIGHTS: "/insights",
+    MESSAGE: "http://localhost:3000/44be3a29-323b-0289-9bdd-de0b009180b1/message",
   },
-  REFRESH_INTERVAL: 30000, // You can adjust this interval if needed
+  REFRESH_INTERVAL: 30000, // Adjust as needed
   HEADERS: {
     Accept: "application/json",
     "Content-Type": "application/json",
   },
 };
 
-// API Service Layer (unchanged)
+// API Service Layer
 class InsightsAPI {
   static async fetchInsights() {
     try {
@@ -108,7 +109,7 @@ class InsightsAPI {
 
   static async deleteInsight(id: string) {
     try {
-      // Encode the id to handle special characters (like colons) correctly
+      // Encode the id to handle special characters correctly
       const encodedId = encodeURIComponent(id);
       const response = await fetch(
         `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.INSIGHTS}/${encodedId}`,
@@ -128,14 +129,33 @@ class InsightsAPI {
       throw error;
     }
   }
-}
 
+  static async sendMessage(text: string, userName?: string, userId?: string, file?: File) {
+    try {
+      const response = await fetch(API_CONFIG.ENDPOINTS.MESSAGE, {
+        method: "POST",
+        headers: API_CONFIG.HEADERS,
+        body: JSON.stringify({ text, userName, userId, file }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to send message: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data; // Expect data to be an array of messages.
+    } catch (error) {
+      console.error("Send Message Error:", error);
+      throw error;
+    }
+  }
+}
 
 export function InsightsSection() {
   const wallet = useWallet();
   const { messages, addMessage } = useChat();
 
-  // Instead of a plain array, we now maintain a cached list with grace periods.
+  // Chat and insights state
   const [cachedInsights, setCachedInsights] = useState<InsightWithGrace[]>([]);
   const [selectedInsight, setSelectedInsight] = useState<Insight | null>(null);
   const [selectedAction, setSelectedAction] = useState<ActionButton["action"] | "">("");
@@ -148,29 +168,26 @@ export function InsightsSection() {
   const [swapAmount, setSwapAmount] = useState("1000000000"); // SUI minimal units (1e9)
   const [sourceFilter, setSourceFilter] = useState<"all" | "telegram" | "twitter">("all");
 
-  // Helper: Returns a unique identifier for an insight.
+  // Helper: Return a unique identifier for an insight.
   const getInsightId = useCallback((insight: Insight) => {
     return insight.type === "market_insight" ? insight.tweet_id : insight.contract;
   }, []);
 
-  // Helper: Merge new insights with our cached insights.
+  // Helper: Merge new insights with cached state.
   const mergeInsights = useCallback(
     (cached: InsightWithGrace[], fresh: Insight[]): InsightWithGrace[] => {
-      const threshold = 2; // grace period: remove only if missing for more than 2 cycles
+      const threshold = 2; // Remove if missing for more than 2 cycles.
       const freshMap = new Map<string, Insight>();
       fresh.forEach((item) => freshMap.set(getInsightId(item), item));
 
       const updated: InsightWithGrace[] = [];
 
-      // Update or increment missingCount for existing items
       cached.forEach((item) => {
         const id = getInsightId(item);
         if (freshMap.has(id)) {
-          // Found in new fetch: update with new data and reset missingCount
           updated.push({ ...freshMap.get(id)!, missingCount: 0 });
           freshMap.delete(id);
         } else {
-          // Not in fresh data: increase missingCount
           const newMissing = item.missingCount + 1;
           if (newMissing <= threshold) {
             updated.push({ ...item, missingCount: newMissing });
@@ -178,7 +195,6 @@ export function InsightsSection() {
         }
       });
 
-      // Add any new insights that weren't in the cache
       freshMap.forEach((insight) => {
         updated.push({ ...insight, missingCount: 0 });
       });
@@ -188,22 +204,20 @@ export function InsightsSection() {
     [getInsightId]
   );
 
-  // Converts SUI amount from minimal units (1e9) to a human-readable number (as a string)
+  // Formatting helpers
   const formatSwapAmount = useCallback((amount: string): string => {
     return (parseInt(amount) / 1e9).toString();
   }, []);
 
-  // Converts token amount from minimal units to a human-readable number
-  // Default decimals are set to 9; change this if the token uses different decimals
   const formatTokenAmount = useCallback(
     (amount: string, decimals: number = 9): string => {
       const value = parseInt(amount) / Math.pow(10, decimals);
-      return value.toFixed(4); // Adjust precision as needed
+      return value.toFixed(4);
     },
     []
   );
 
-  // Instead of replacing the insights array completely, merge new data with cached state.
+  // Fetch insights periodically.
   const fetchInsights = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -235,18 +249,16 @@ export function InsightsSection() {
 
   const handleDelete = async () => {
     if (selectedForDeletion.length === 0) return;
-  
+
     setIsDeleting(true);
     try {
-      // Optimistically remove the insights from the local state immediately.
       setCachedInsights((prev) =>
         prev.filter((insight) => !selectedForDeletion.includes(getInsightId(insight)))
       );
-  
+
       await Promise.all(
         selectedForDeletion.map((id) => InsightsAPI.deleteInsight(id))
       );
-      // Optionally, trigger a fetch to ensure state consistency
       await fetchInsights();
       setSelectedForDeletion([]);
     } catch (error) {
@@ -294,7 +306,6 @@ export function InsightsSection() {
           throw new Error("Failed to get quote");
         }
 
-        // Convert the expected output from minimal units to a human-readable value.
         const expectedOutput = formatTokenAmount(quoteResponse.expectedAmountOut, 9);
 
         addMessage(
@@ -321,16 +332,13 @@ export function InsightsSection() {
         });
 
         addMessage(
-          `✅ Swap successful!\n\nToken: ${selectedInsight.symbol}\n` +
-            `Amount: ${formatSwapAmount(swapAmount)} SUI\nTx: ${response.digest}`,
+          `✅ Swap successful!\n\nToken: ${selectedInsight.symbol}\nAmount: ${formatSwapAmount(swapAmount)} SUI\nTx: ${response.digest}`,
           "ai"
         );
       } catch (error) {
         console.error("Swap failed:", error);
         addMessage(
-          `❌ Swap failed: ${
-            error instanceof Error ? error.message : "Unknown error"
-          }`,
+          `❌ Swap failed: ${error instanceof Error ? error.message : "Unknown error"}`,
           "ai"
         );
       } finally {
@@ -338,39 +346,42 @@ export function InsightsSection() {
       }
     } else {
       setInputValue(
-        `${action.charAt(0).toUpperCase() + action.slice(1)} ${selectedInsight.name} ` +
-          `(${selectedInsight.contract})`
+        `${action.charAt(0).toUpperCase() + action.slice(1)} ${selectedInsight.name} (${selectedInsight.contract})`
       );
     }
   };
 
-  const handleSendMessage = useCallback(() => {
+  // Chat functionality: send message via API endpoint and process response
+  const handleSendMessage = useCallback(async () => {
     const trimmedInput = inputValue.trim();
     if (!trimmedInput) return;
 
+    // Add user's message to the chat.
     addMessage(trimmedInput, "user");
 
-    const aiResponse =
-      selectedAction && selectedInsight && selectedInsight.type !== "market_insight"
-        ? `${selectedAction.charAt(0).toUpperCase() + selectedAction.slice(1)}ing ${
-            selectedInsight.name
-          }...\n\nContract: ${selectedInsight.contract}\nPrice: ${
-            selectedInsight.price
-          }\nMarket Cap: ${selectedInsight.market_cap}`
-        : `Analyzing ${selectedInsight?.name || ""}...`;
+    // Display a placeholder message while waiting for the API response.
+    addMessage("analyezing... please wait", "ai");
 
-    setTimeout(() => {
-      addMessage(aiResponse, "ai");
-    }, 1000);
+    try {
+      const response = await InsightsAPI.sendMessage(trimmedInput);
+      // Expecting response to be an array of messages.
+      response.forEach((msg: { user: string; text: string; action: string }) => {
+        // Display each message with proper attribution.
+        addMessage(msg.text, msg.user === "Everion" ? "ai" : "user");
+      });
+    } catch (error) {
+      console.error("Error sending message:", error);
+      addMessage("Failed to send message. Please try again.", "ai");
+    }
 
     setInputValue("");
-  }, [inputValue, selectedAction, selectedInsight, addMessage]);
+  }, [inputValue, addMessage]);
 
   const formatTimestamp = useCallback((timestamp: string): string => {
     return new Date(timestamp).toLocaleString();
   }, []);
 
-  // Filter cached insights by source (for display purposes)
+  // Filter cached insights by source for display purposes.
   const filteredInsights = useMemo(
     () =>
       cachedInsights.filter((insight) =>
@@ -415,9 +426,7 @@ export function InsightsSection() {
               ) : (
                 <Trash2 className="h-4 w-4" />
               )}
-              {isDeleting
-                ? "Deleting..."
-                : `Delete (${selectedForDeletion.length})`}
+              {isDeleting ? "Deleting..." : `Delete (${selectedForDeletion.length})`}
             </Button>
           )}
         </div>
@@ -561,6 +570,7 @@ export function InsightsSection() {
         )}
       </div>
 
+      {/* Chat Interface */}
       <div className="mt-auto">
         <ScrollArea className="h-[200px] mb-4 rounded-lg border bg-muted/50 p-4">
           {messages.map((message) => (
@@ -622,9 +632,12 @@ export function InsightsSection() {
             <Input
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={(e) =>
-                e.key === "Enter" && !e.shiftKey && handleSendMessage()
-              }
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendMessage();
+                }
+              }}
               placeholder="Type your message..."
               className="flex-grow"
             />
