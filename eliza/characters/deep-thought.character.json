@@ -1,6 +1,6 @@
 {
     "name": "Everion",
-    "clients": [],
+    "clients": ["client-direct"],
     "modelProvider": "openai",
     "settings": {
         "voice": {
