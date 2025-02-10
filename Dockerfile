@@ -22,15 +22,15 @@ RUN apt-get update -qq && \
       python3 \
       python3-pip
 
-# Install Node modules
+# Install Node modules with legacy peer dependencies
 COPY package-lock.json package.json ./
-RUN npm ci --include=dev
+RUN npm install --legacy-peer-deps
 
 # Copy all application code
 COPY . .
 
 # Build the Next.js application
-RUN npx next build --experimental-build-mode compile
+RUN npm run build
 
 # Remove development-only Node modules
 RUN npm prune --omit=dev
@@ -53,7 +53,7 @@ COPY --from=build /app /app
 COPY start.sh /app/start.sh
 RUN chmod +x /app/start.sh
 
-# Expose port 3000 for Next.js (public) and note that the Python API is on port 3001.
+# Expose port 3000 for Next.js (public)
 EXPOSE 3000
 
 # Set the container’s entrypoint to our startup script.
