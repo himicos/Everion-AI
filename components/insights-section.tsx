@@ -66,10 +66,10 @@ const actionButtons: ActionButton[] = [
 
 // API Configuration
 const API_CONFIG = {
-  BASE_URL: "https://everion-fastapi.fly.dev",
+  BASE_URL: process.env.APP_URL || "https://everion-fastapi.fly.dev",
   ENDPOINTS: {
     INSIGHTS: "/insights",
-    MESSAGE: "http://localhost:3002/44be3a29-323b-0289-9bdd-de0b009180b1/message",
+    MESSAGE: process.env.APP_MESSAGE_URL || "http://localhost:3002/44be3a29-323b-0289-9bdd-de0b009180b1/message",
   },
   REFRESH_INTERVAL: 30000, // Adjust as needed
   HEADERS: {
@@ -77,6 +77,8 @@ const API_CONFIG = {
     "Content-Type": "application/json",
   },
 };
+
+console.log("App Message URL:", process.env.APP_MESSAGE_URL);
 
 // API Service Layer
 class InsightsAPI {
