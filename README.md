@@ -86,27 +86,17 @@ Everion AI is a real-time crypto data scraper that gives you first-hand insights
 
 ## Install and Build Eliza
 
-8. Follow the [Quickstart Guide for Eliza](https://elizaos.github.io/eliza/docs/quickstart/).
-
-9. Checkout to the `backend` branch, then fetch or pull the latest changes:
-
-   ```bash
-   git checkout backend
-   git fetch
-   git pull
-   ```
-
-10. Install Eliza from the Git repository.
+(Optiona) Original eliza setup guide is described here: [Quickstart Guide for Eliza](https://elizaos.github.io/eliza/docs/quickstart/).
 
 ## Install nvm (Node Version Manager)
 
-11. Install `nvm` by running the following command:
+1. Install `nvm` by running the following command:
 
    ```bash
    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.5/install.sh | bash
    ```
 
-12. Reload your shell configuration:
+2. Reload your shell configuration:
 
    ```bash
    source ~/.bashrc
@@ -114,13 +104,13 @@ Everion AI is a real-time crypto data scraper that gives you first-hand insights
 
 ## Install Node.js
 
-13. Install Node.js version 23:
+3. Install Node.js version 23:
 
    ```bash
    nvm install 23
    ```
 
-14. Verify the installation:
+4. Verify the installation:
 
    ```bash
    node -v
@@ -128,7 +118,7 @@ Everion AI is a real-time crypto data scraper that gives you first-hand insights
 
    This should output the version of Node.js (e.g., `v23.x.x`).
 
-15. Use Node.js version 23:
+5. Use Node.js version 23:
 
    ```bash
    nvm use 23
@@ -136,41 +126,41 @@ Everion AI is a real-time crypto data scraper that gives you first-hand insights
 
 ## Install npm and pnpm
 
-16. Install `pnpm` globally:
+6. Install `pnpm` globally:
 
    ```bash
    npm install -g pnpm
    ```
 
-17. Verify the installation:
+7. Verify the installation:
 
    ```bash
    pnpm -v
    ```
 
-18. Navigate to the Eliza directory:
+8. Navigate to the Eliza directory:
 
    ```bash
    cd eliza
    ```
 
-19. Place the `.env` file in the `eliza/` directory.
+9. Place the `.env` file in the `eliza/` directory.
 
-20. Install dependencies:
+10. Install dependencies:
 
    ```bash
    pnpm install
    ```
 
-21. Build the project:
+11. Build the project:
 
    ```bash
    pnpm build
    ```
 
-22. Open two terminal windows.
+12. Open two terminal windows.
 
-23. In the first terminal, start Eliza with the specified character:
+13. In the first terminal, start Eliza with the specified character:
 
    ```bash
    pnpm start --character="characters/everion.character.json"
