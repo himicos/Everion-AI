@@ -5,6 +5,8 @@
 
 AI-powered agent integrated with the SUI ecosystem. It is capable of analyzing tokens, facilitating chat and discussion and more to come. The SUI integration provides capabilities to log in using a wallet, quickly buy tokens, view your portfolio, and aggregate and analyze insights about particular tokens.
 
+[Website](https://everion.ai/)
+
 ### Features
 
 - Token Analysis: Analyze various tokens and get detailed insights.
