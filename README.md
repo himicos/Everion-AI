@@ -77,7 +77,7 @@ Everion AI is a real-time crypto data scraper that gives you first-hand insights
    ```bash
    flyctl secrets set TELEGRAM_API_ID= \
    TELEGRAM_API_HASH= \
-   TELEGRAM_PHONE_NUMBER="+436508974273" \
+   TELEGRAM_PHONE_NUMBER="" \
    SOURCE_CHAT_ID_1= \
    SOURCE_CHAT_ID_2= \
    TARGET_CHANNEL_ID= \
