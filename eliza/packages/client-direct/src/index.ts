@@ -121,7 +121,7 @@ export class DirectClient {
         this.app = express();
         this.app.use(cors());
         this.agents = new Map();
-
+        
         this.app.use(bodyParser.json());
         this.app.use(bodyParser.urlencoded({ extended: true }));
 
@@ -1030,7 +1030,7 @@ export const DirectClientInterface: Client = {
     start: async (_runtime: IAgentRuntime) => {
         elizaLogger.log("DirectClientInterface start");
         const client = new DirectClient();
-        const serverPort = Number.parseInt(settings.SERVER_PORT || "3000");
+        const serverPort = Number.parseInt(settings.SERVER_PORT || "3002");
         client.start(serverPort);
         return client;
     },

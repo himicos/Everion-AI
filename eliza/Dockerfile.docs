@@ -38,6 +38,6 @@ RUN pnpm build
 # Stage 3a: Serve with `docusaurus serve`.
 FROM prod AS serve
 ## Expose the port that Docusaurus will run on.
-EXPOSE 3000
+EXPOSE 3002
 ## Run the production server.
 CMD ["pnpm", "run", "serve", "--host", "0.0.0.0", "--no-open"]

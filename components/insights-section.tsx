@@ -69,7 +69,7 @@ const API_CONFIG = {
   BASE_URL: "https://everion-fastapi.fly.dev",
   ENDPOINTS: {
     INSIGHTS: "/insights",
-    MESSAGE: "http://localhost:3001/44be3a29-323b-0289-9bdd-de0b009180b1/message",
+    MESSAGE: "http://localhost:3002/44be3a29-323b-0289-9bdd-de0b009180b1/message",
   },
   REFRESH_INTERVAL: 30000, // Adjust as needed
   HEADERS: {
@@ -89,18 +89,14 @@ class InsightsAPI {
           headers: API_CONFIG.HEADERS,
         }
       );
-
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-
       const data = await response.json();
-
-      // We expect either an array of insights or a message indicating no insights.
+      // Expect either an array of insights or a message indicating no insights.
       if (!Array.isArray(data) && data.message !== "No insights available") {
         throw new Error("Invalid response format");
       }
-
       return data;
     } catch (error) {
       console.error("API Error:", error);
@@ -110,7 +106,6 @@ class InsightsAPI {
 
   static async deleteInsight(id: string) {
     try {
-      // Encode the id to handle special characters correctly
       const encodedId = encodeURIComponent(id);
       const response = await fetch(
         `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.INSIGHTS}/${encodedId}`,
@@ -119,11 +114,9 @@ class InsightsAPI {
           headers: API_CONFIG.HEADERS,
         }
       );
-
       if (!response.ok) {
         throw new Error(`Failed to delete insight: ${id}`);
       }
-
       return true;
     } catch (error) {
       console.error("Delete Error:", error);
@@ -131,27 +124,41 @@ class InsightsAPI {
     }
   }
 
+  // New method: Fetch a specific insight by contract.
+  static async fetchInsightByContract(contract: string) {
+    try {
+      const response = await fetch(
+        `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.INSIGHTS}/${contract}`,
+        {
+          method: "GET",
+          headers: API_CONFIG.HEADERS,
+        }
+      );
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error("Error fetching insight by contract:", error);
+      throw error;
+    }
+  }
+
   /**
    * Send a message to the chat endpoint.
-   * The "file" parameter now contains the full JSON context (as a string) from the insights endpoint.
+   * We now send a single concatenated string containing the user's text and additional context.
    */
-  static async sendMessage(
-    text: string,
-    userName?: string,
-    userId?: string,
-    file?: string
-  ) {
+  static async sendMessage(text: string, userName?: string, userId?: string) {
     try {
       const response = await fetch(API_CONFIG.ENDPOINTS.MESSAGE, {
         method: "POST",
         headers: API_CONFIG.HEADERS,
-        body: JSON.stringify({ text, userName, userId, file }),
+        body: JSON.stringify({ text, userName, userId }),
       });
-
       if (!response.ok) {
         throw new Error(`Failed to send message: ${response.statusText}`);
       }
-
       const data = await response.json();
       return data; // Expect data to be an array of messages.
     } catch (error) {
@@ -191,7 +198,6 @@ export function InsightsSection() {
       fresh.forEach((item) => freshMap.set(getInsightId(item), item));
 
       const updated: InsightWithGrace[] = [];
-
       cached.forEach((item) => {
         const id = getInsightId(item);
         if (freshMap.has(id)) {
@@ -204,11 +210,9 @@ export function InsightsSection() {
           }
         }
       });
-
       freshMap.forEach((insight) => {
         updated.push({ ...insight, missingCount: 0 });
       });
-
       return updated;
     },
     [getInsightId]
@@ -259,13 +263,11 @@ export function InsightsSection() {
 
   const handleDelete = async () => {
     if (selectedForDeletion.length === 0) return;
-
     setIsDeleting(true);
     try {
       setCachedInsights((prev) =>
         prev.filter((insight) => !selectedForDeletion.includes(getInsightId(insight)))
       );
-
       await Promise.all(
         selectedForDeletion.map((id) => InsightsAPI.deleteInsight(id))
       );
@@ -290,37 +292,30 @@ export function InsightsSection() {
 
   const handleActionClick = async (action: ActionButton["action"]) => {
     setSelectedAction(action);
-
     if (!selectedInsight || selectedInsight.type === "market_insight") return;
-
     if (action === "ape") {
       if (!wallet.connected || !wallet.account?.address) {
         addMessage("Please connect your wallet to perform a swap.", "ai");
         return;
       }
-
       setIsSwapping(true);
       addMessage(
         `Preparing swap for ${selectedInsight.name} (${selectedInsight.symbol})...`,
         "ai"
       );
-
       try {
         const quoteResponse = await getQuote({
           tokenIn: "0x2::sui::SUI",
           tokenOut: selectedInsight.contract,
           amountIn: swapAmount,
         });
-
         if (!quoteResponse) {
           throw new Error("Failed to get quote");
         }
-
         addMessage(
           `Found best route!\n\nSwapping: ${formatSwapAmount(swapAmount)} SUI\nPrice Impact: ${(quoteResponse.priceImpact || 0).toFixed(4)}%`,
           "ai"
         );
-
         const result = await buildTx({
           quoteResponse,
           accountAddress: wallet.account.address,
@@ -330,15 +325,12 @@ export function InsightsSection() {
             commissionBps: 0,
           },
         });
-
         if (!result?.tx) {
           throw new Error("Failed to build transaction");
         }
-
         const response = await wallet.signAndExecuteTransactionBlock({
           transactionBlock: result.tx,
         });
-
         addMessage(
           `✅ Swap successful!\n\nToken: ${selectedInsight.symbol}\nAmount: ${formatSwapAmount(swapAmount)} SUI\nTx: ${response.digest}`,
           "ai"
@@ -359,33 +351,46 @@ export function InsightsSection() {
     }
   };
 
-  // Chat functionality: send message via API endpoint and process response.
-  // When the selected action is either "analyse" or "discuss", we pass the full JSON
-  // (stringified) from the selected insight as the "file" parameter so that ElizaOS receives full context.
+  // Handle sending the message. This function now fetches the latest insight details,
+  // converts the JSON into a concise string with key parameters, and appends it to the message.
   const handleSendMessage = useCallback(async () => {
     const trimmedInput = inputValue.trim();
     if (!trimmedInput) return;
 
-    // Add user's message to the chat.
-    addMessage(trimmedInput, "user");
+    // Log the user message for debugging.
+    console.log("User message:", trimmedInput);
 
-    // Display a placeholder message while waiting for the API response.
-    addMessage("Loading response...", "ai");
-
-    let fileContext: string | undefined;
+    // Initialize context string.
+    let contextText = "";
     if ((selectedAction === "analyse" || selectedAction === "discuss") && selectedInsight) {
-      // Reveal the full JSON from the insights API as context.
-      fileContext = JSON.stringify(selectedInsight, null, 2);
+      // Only for token insights, fetch the latest data by contract.
+      if (selectedInsight.type !== "market_insight") {
+        try {
+          const freshInsight: TokenInsight = await InsightsAPI.fetchInsightByContract(selectedInsight.contract);
+          contextText = `\n\n-- Insight Details --\nContract: ${freshInsight.contract}\nName: ${freshInsight.name}\nSymbol: ${freshInsight.symbol}\nPrice: ${freshInsight.price}\nTop Holder Percentage: ${freshInsight.top_10_holders_percentage}\nPrice Movement: ${freshInsight.price_change_24h}\nHolders Amount: ${freshInsight.holders}`;
+        } catch (error) {
+          console.error("Error fetching fresh insight:", error);
+          // Fallback to cached details if the fetch fails.
+          contextText = `\n\n-- Insight Details (cached) --\nContract: ${selectedInsight.contract}\nName: ${selectedInsight.name}\nSymbol: ${selectedInsight.symbol}\nPrice: ${selectedInsight.price}\nTop Holder Percentage: ${selectedInsight.top_10_holders_percentage}\nPrice Movement: ${selectedInsight.price_change_24h}\nHolders Amount: ${selectedInsight.holders}`;
+        }
+      } else {
+        // For market insights.
+        contextText = `\n\n-- Market Insight Details --\nTweet ID: ${selectedInsight.tweet_id}\nSummary: ${selectedInsight.summary}`;
+      }
     }
 
+    // Merge the user's input with the context string.
+    const fullMessage = trimmedInput + contextText;
+    console.log("Full message to send:", fullMessage);
+
+    // Add the user message (without context) to the chat.
+    addMessage(trimmedInput, "user");
+    // Show a placeholder while processing.
+    addMessage("Waiting for response...", "ai");
+
     try {
-      const response = await InsightsAPI.sendMessage(
-        trimmedInput,
-        undefined,
-        undefined,
-        fileContext
-      );
-      // Expecting response to be an array of messages.
+      const response = await InsightsAPI.sendMessage(fullMessage);
+      // Process the response messages.
       response.forEach((msg: { user: string; text: string; action: string }) => {
         addMessage(msg.text, msg.user === "Everion" ? "ai" : "user");
       });
