@@ -66,10 +66,10 @@ const actionButtons: ActionButton[] = [
 
 // API Configuration
 const API_CONFIG = {
-  BASE_URL: process.env.APP_URL || "https://everion-fastapi.fly.dev",
+  BASE_URL: process.env.APP_URL || "https://everion-fastapi.fly.dev", // don't change
   ENDPOINTS: {
     INSIGHTS: "/insights",
-    MESSAGE: process.env.APP_MESSAGE_URL || "http://localhost:3002/44be3a29-323b-0289-9bdd-de0b009180b1/message",
+    MESSAGE: process.env.APP_MESSAGE_URL || "https://0efa-94-131-109-101.ngrok-free.app/44be3a29-323b-0289-9bdd-de0b009180b1/message", //change to localhost if running locally
   },
   REFRESH_INTERVAL: 30000, // Adjust as needed
   HEADERS: {
