@@ -17,8 +17,9 @@ AI-powered agent integrated with the SUI ecosystem. It is capable of analyzing t
   - View your portfolio.
 - Insights Aggregation: Aggregate and analyze insights about specific tokens from multiple sources.
 
-![Scalability](https://github.com/user-attachments/assets/a47a0094-110f-4724-a044-8fd233094b90)
+Everion AI is a real-time crypto data scraper that gives you first-hand insights straight from the source. It collects data from trusted accounts for market insights and from Telegram chats for the degen vibe—offering a clear picture of what's really happening. Designed to fit perfectly within the Sui ecosystem, it provides open-source APIs and modular components that you can easily build on. Whether you're developing trading bots, sentiment tools, or analytics dashboards, Everion AI supplies the fresh, actionable data you need to make smart decisions and drive innovation.
 
+![Scalability](https://github.com/user-attachments/assets/a47a0094-110f-4724-a044-8fd233094b90)
 
 ### Getting Started
 
