@@ -10,7 +10,6 @@ import os
 
 # Load environment variables from .env file
 load_dotenv()
-print("Environment variables:", os.environ)
 
 def get_int_env(var_name):
     value = os.getenv(var_name)

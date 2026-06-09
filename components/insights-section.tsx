@@ -69,7 +69,7 @@ const API_CONFIG = {
   BASE_URL: process.env.APP_URL || "https://everion-fastapi.fly.dev", // don't change
   ENDPOINTS: {
     INSIGHTS: "/insights",
-    MESSAGE: process.env.APP_MESSAGE_URL || "https://029c-37-235-55-68.ngrok-free.app/44be3a29-323b-0289-9bdd-de0b009180b1/message", //change to localhost if running locally
+    MESSAGE: process.env.APP_MESSAGE_URL || "http://localhost:3000/message", // set APP_MESSAGE_URL in env for production
   },
   REFRESH_INTERVAL: 30000, // Adjust as needed
   HEADERS: {
