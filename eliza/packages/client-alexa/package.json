@@ -23,12 +23,12 @@
         "@elizaos/plugin-node": "workspace:*",
         "ask-sdk-core": "^2.14.0",
         "ask-sdk-model": "^1.86.0",
-        "axios": "1.7.9"
+        "axios": "1.16.0"
     },
     "devDependencies": {
         "@biomejs/biome": "1.5.3",
         "tsup": "^8.3.5",
-        "vitest": "1.6.1"
+        "vitest": "3.2.6"
     },
     "scripts": {
         "build": "tsup --format esm --dts",
