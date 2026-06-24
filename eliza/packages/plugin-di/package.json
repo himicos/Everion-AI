@@ -22,7 +22,7 @@
         "@elizaos/core": "workspace:*",
         "inversify": "^6.2.1",
         "reflect-metadata": "^0.2.2",
-        "uuid": "11.0.3"
+        "uuid": "14.0.0"
     },
     "devDependencies": {
         "@biomejs/biome": "1.9.4",
